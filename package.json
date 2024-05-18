@@ -1,0 +1,9 @@
+{
+  "name": "bjdskjy",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "mqtt": "^5.6.1"
+  }
+}

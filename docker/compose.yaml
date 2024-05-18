@@ -1,0 +1,12 @@
+services:
+  app:
+    restart: always
+    image: nayukidayo/bjdskjy:latest
+    logging:
+      driver: local
+    ports:
+      - '37212:3000'
+    environment:
+      - MQTT_URL=
+      - MQTT_USER=
+      - MQTT_PASS=
