@@ -1,6 +1,6 @@
 services:
   app:
-    restart: always
+    restart: unless-stopped
     image: nayukidayo/bjdskjy:latest
     logging:
       driver: local

@@ -1,4 +1,6 @@
-import { createServer } from 'node:http'
+// @ts-check
+
+import { IncomingMessage, ServerResponse, createServer } from 'node:http'
 import process from 'node:process'
 import mqtt from 'mqtt'
 
@@ -16,13 +18,7 @@ const client = mqtt.connect(env.MQTT_URL, {
 client.on('error', err => console.log('[mqtt_error]', err))
 
 const server = createServer((req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host}`)
-
-  if (req.headers.authorization !== 'nayukidayo') {
-    res.statusCode = 401
-    res.end()
-    return
-  }
+  const url = new URL(req.url || '', `http://${req.headers.host}`)
 
   if (url.pathname !== '/api/status') {
     res.statusCode = 404
@@ -30,29 +26,37 @@ const server = createServer((req, res) => {
     return
   }
 
-  if (req.method === 'POST') {
-    return setStatus(req, res)
+  if (req.method !== 'POST') {
+    res.statusCode = 405
+    res.end()
+    return
   }
 
-  res.statusCode = 405
-  res.end()
+  if (req.headers.authorization !== 'nayukidayo') {
+    res.statusCode = 401
+    res.end()
+    return
+  }
+
+  setStatus(req, res)
 })
 
 server.listen('3000', () => console.log('Server is running'))
 
+/**
+ * @param {IncomingMessage} req
+ * @param {ServerResponse} res
+ */
 function setStatus(req, res) {
   const buf = []
   req.on('data', chunk => buf.push(chunk))
   req.on('end', async () => {
     try {
+      /** @type {{addr: number, status: number}} */
       const data = JSON.parse(Buffer.concat(buf).toString())
-      if (data.status === 1) {
-        const msg = Buffer.from('011000050001020164CD89', 'hex')
-        await client.publishAsync('BJDSKJY/Get', msg, { qos: 1 })
-      } else {
-        const msg = Buffer.from('011000050001020264CD89', 'hex')
-        await client.publishAsync('BJDSKJY/Get', msg, { qos: 1 })
-      }
+      const addr = data.addr.toString(16).padStart(2, '0')
+      const status = data.status === 1 ? '01' : '02'
+      await sendMsg(addr, status)
       res.statusCode = 200
     } catch (err) {
       console.log('[setStatus]', err)
@@ -61,6 +65,16 @@ function setStatus(req, res) {
       res.end()
     }
   })
+}
+
+/**
+ * @param {string} addr
+ * @param {string} status
+ * @returns {Promise}
+ */
+function sendMsg(addr, status) {
+  const msg = Buffer.from(`${addr}100005000102${status}640000`, 'hex')
+  return client.publishAsync('BJDSKJY/Get', msg, { qos: 1 })
 }
 
 process.on('SIGHUP', () => process.exit(128 + 1))
